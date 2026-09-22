@@ -24,7 +24,7 @@ Port of `beacon_flutter_sdk` — same API surface, same wire format.
 ## Installation
 
 ```sh
-npm install git+https://github.com/<org>/beacon-react-native-sdk.git
+npm install git+https://github.com/JunaidStudio93/beacon_react_native_sdk.git
 npx expo install expo-sqlite
 ```
 
