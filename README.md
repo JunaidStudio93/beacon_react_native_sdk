@@ -13,15 +13,29 @@ Port of `beacon_flutter_sdk` — same API surface, same wire format.
 - Auto-attaches platform, app version, and timezone
 - Country is set server-side from the request IP (not by the SDK)
 
+## Requirements
+
+- **Expo SDK 51 or newer.** The SQLite adapter uses the async API
+  (`openDatabaseAsync` / `runAsync` / `getAllAsync`), which replaced the old
+  callback-and-transaction API in SDK 51. On SDK 50 or older the adapter will
+  not work and needs rewriting against the legacy API.
+- Verified against `expo-sqlite` 57.0.3.
+
 ## Installation
 
 ```sh
-npm install beacon-react-native-sdk expo-sqlite
+npm install beacon-react-native-sdk
+npx expo install expo-sqlite
 ```
+
+Use `npx expo install` (not `npm install`) for `expo-sqlite` so the version
+matches your Expo SDK.
 
 `expo-sqlite` is the default store and works in both Expo and bare React
 Native projects. To use a different engine (op-sqlite, nitro-sqlite, ...),
-implement the `BeaconDatabase` interface and pass it to `initialize`.
+implement the `BeaconDatabase` interface and pass it to `initialize`. The
+published type definitions carry no reference to `expo-sqlite`, so you are not
+forced to install it in that case.
 
 App version is read from `expo-application` or `react-native-device-info` if
 either is installed; otherwise it resolves to `''`. Timezone comes from the
