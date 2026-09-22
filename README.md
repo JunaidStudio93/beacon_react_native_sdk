@@ -24,12 +24,19 @@ Port of `beacon_flutter_sdk` — same API surface, same wire format.
 ## Installation
 
 ```sh
-npm install beacon-react-native-sdk
+npm install git+https://github.com/<org>/beacon-react-native-sdk.git
 npx expo install expo-sqlite
 ```
 
+To pin a release, append a tag or commit: `...git#v0.0.1`.
+
+The package is written in TypeScript and compiled on install by the `prepare`
+script, so a git dependency needs no extra build step.
+
 Use `npx expo install` (not `npm install`) for `expo-sqlite` so the version
-matches your Expo SDK.
+matches your Expo SDK. It contains native code: after installing, rebuild the
+app (`npx expo prebuild` then `npx expo run:ios` / `run:android`, or a new EAS
+build). Expo Go already bundles it. A Metro reload alone is not enough.
 
 `expo-sqlite` is the default store and works in both Expo and bare React
 Native projects. To use a different engine (op-sqlite, nitro-sqlite, ...),
