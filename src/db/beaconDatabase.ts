@@ -1,3 +1,5 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
+
 /// A pending row as stored locally, mirroring the Drift `PendingEvents` table.
 export interface PendingEvent {
   readonly id: number;
@@ -34,18 +36,6 @@ CREATE TABLE IF NOT EXISTS pending_events (
   properties_json TEXT NOT NULL
 );`;
 
-interface ExpoSQLiteDatabase {
-  runAsync(sql: string, params?: unknown[]): Promise<{ lastInsertRowId: number }>;
-  getAllAsync<T>(sql: string, params?: unknown[]): Promise<T[]>;
-  getFirstAsync<T>(sql: string, params?: unknown[]): Promise<T | null>;
-  execAsync(sql: string): Promise<void>;
-  closeAsync(): Promise<void>;
-}
-
-interface ExpoSQLiteModule {
-  openDatabaseAsync(name: string): Promise<ExpoSQLiteDatabase>;
-}
-
 interface SqliteRow {
   id: number;
   event_name: string;
@@ -59,19 +49,23 @@ interface SqliteRow {
 
 /// Default on-device store, backed by `expo-sqlite`. The database is opened
 /// lazily on first use, mirroring Drift's `LazyDatabase`.
+///
+/// `expo-sqlite` is imported lazily: the type-only import is erased at compile
+/// time and the module is `require`d on first use, so this file stays
+/// importable (and testable) without the native module present.
 export class SqliteBeaconDatabase implements BeaconDatabase {
   private readonly fileName: string;
-  private handle?: Promise<ExpoSQLiteDatabase>;
+  private handle?: Promise<SQLiteDatabase>;
 
   constructor(fileName = 'beacon_events.sqlite') {
     this.fileName = fileName;
   }
 
-  private open(): Promise<ExpoSQLiteDatabase> {
+  private open(): Promise<SQLiteDatabase> {
     if (!this.handle) {
       this.handle = (async () => {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const sqlite = require('expo-sqlite') as ExpoSQLiteModule;
+        const sqlite = require('expo-sqlite') as typeof import('expo-sqlite');
         const db = await sqlite.openDatabaseAsync(this.fileName);
         await db.execAsync(CREATE_TABLE_SQL);
         return db;

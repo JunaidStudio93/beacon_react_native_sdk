@@ -4,25 +4,41 @@
   "description": "Beacon event tracking SDK for React Native with SQLite-backed batching.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "jest",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["react-native", "analytics", "events", "beacon"],
+  "keywords": [
+    "react-native",
+    "analytics",
+    "events",
+    "beacon"
+  ],
   "license": "MIT",
   "peerDependencies": {
     "react-native": ">=0.71.0"
   },
   "peerDependenciesMeta": {
-    "expo-sqlite": { "optional": true },
-    "expo-application": { "optional": true },
-    "react-native-device-info": { "optional": true }
+    "expo-sqlite": {
+      "optional": true
+    },
+    "expo-application": {
+      "optional": true
+    },
+    "react-native-device-info": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/node": "^20.14.0",
+    "expo-sqlite": "^57.0.3",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.0",
     "typescript": "^5.5.0"
