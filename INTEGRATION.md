@@ -304,31 +304,7 @@ awaiting them in UI code.
 
 ---
 
-## 10. Using a different SQLite engine
-
-`expo-sqlite` is the default, not a hard requirement. Implement the
-`BeaconDatabase` interface and pass it to `initialize`:
-
-```ts
-import type { BeaconDatabase } from 'beacon-react-native-sdk';
-
-class OpSqliteBeaconDatabase implements BeaconDatabase {
-  insertEvent(entry) { /* ... */ }
-  pendingCount()     { /* ... */ }
-  allPending()       { /* ... */ }
-  deleteByIds(ids)   { /* ... */ }
-  close()            { /* ... */ }
-}
-
-await Beacon.initialize({ apiKey, baseUrl, database: new OpSqliteBeaconDatabase() });
-```
-
-The published type definitions carry no reference to `expo-sqlite`, so it does
-not need to be installed in that case.
-
----
-
-## 11. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
@@ -341,7 +317,7 @@ not need to be installed in that case.
 
 ---
 
-## 12. Status
+## 11. Status
 
 - Ported from `beacon_flutter_sdk` 0.0.1; identical API surface and wire format
 - Type-checked against `expo-sqlite` 57.0.3
