@@ -10,6 +10,7 @@ Port of `beacon_flutter_sdk` — same API surface, same wire format.
 - Flush automatically when the batch size is reached
 - Optional `immediate: true` to upload without waiting for the batch
 - Manual `flush()` for app lifecycle (background / unmount)
+- `refresh()` to upload everything pending and start a new session
 - Auto-attaches platform, app version, and timezone
 - Country is set server-side from the request IP (not by the SDK)
 
@@ -85,6 +86,9 @@ await Beacon.instance.push({
 
 // Flush leftover events (e.g. on AppState background)
 await Beacon.instance.flush();
+
+// End the current session: upload everything pending, then start a new one
+await Beacon.instance.refresh();
 ```
 
 Events are `POST`ed to `{baseUrl}/track` with header `x-api-key`.

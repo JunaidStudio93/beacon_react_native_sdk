@@ -192,7 +192,44 @@ useEffect(() => {
 
 ---
 
-## 6. How it behaves
+## 6. Starting a new session
+
+`refresh()` uploads everything pending, then generates a new session token.
+Call it when the current session ends — typically on sign-out, sign-in, or
+when the app returns to the foreground after a long absence.
+
+```ts
+await Beacon.instance.refresh();
+```
+
+- Events pushed **before** the call keep the old session token.
+- Events pushed **after** it carry the new one.
+- Each event stores its token at push time, so if the upload fails the
+  stranded events stay queued under the session they belong to. A later batch
+  may legitimately contain two sessions.
+- The new session starts whether or not the upload succeeded — a failed
+  network call does not leave you stuck in the old session.
+- It runs on the same internal lock as `flush()`, so no `push` or `flush` can
+  slip between the upload and the token change.
+
+Read the current token with `Beacon.instance.sessionToken`.
+
+Example on sign-out:
+
+```ts
+async function signOut() {
+  await Beacon.instance.push({
+    eventName: 'sign_out',
+    funnel: 'account',
+    type: 'lifecycle',
+    uid: user.id,
+  });
+  await Beacon.instance.refresh(); // sends it, then starts a fresh session
+  await auth.signOut();
+}
+```
+
+## 7. How it behaves
 
 1. Every `push()` **writes to local SQLite first**, then decides whether to
    upload. Nothing is lost to a crash mid-request.
@@ -242,7 +279,7 @@ x-api-key: {apiKey}
 
 ---
 
-## 7. Sanitization rules
+## 8. Sanitization rules
 
 Applied automatically to `eventName` and `funnel`:
 
@@ -263,7 +300,7 @@ Applied automatically to `eventName` and `funnel`:
 
 ---
 
-## 8. Verification checklist
+## 9. Verification checklist
 
 Work through this on first integration:
 
@@ -281,7 +318,7 @@ The offline test matters most — that is the path with the least coverage.
 
 ---
 
-## 9. Known limitations
+## 10. Known limitations
 
 Carried over deliberately from the Flutter SDK so both stay identical. Not
 bugs introduced in this port, but they will be hit in production:
@@ -304,7 +341,7 @@ awaiting them in UI code.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
@@ -317,7 +354,7 @@ awaiting them in UI code.
 
 ---
 
-## 11. Status
+## 12. Status
 
 - Ported from `beacon_flutter_sdk` 0.0.1; identical API surface and wire format
 - Type-checked against `expo-sqlite` 57.0.3

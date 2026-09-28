@@ -163,6 +163,27 @@ export class Beacon {
     return current;
   }
 
+  /// Uploads everything pending, then starts a new session.
+  ///
+  /// Runs on the same lock as [flush], so no push or flush can interleave
+  /// between the upload and the new token. Events queued before the call keep
+  /// the previous token — including events the upload failed to deliver, which
+  /// stay queued and are retried under the session they belong to.
+  refresh(): Promise<void> {
+    const previous = this.flushLock;
+    const current = previous.then(async () => {
+      await this.flushInternal();
+      this.config.regenerateSession();
+    });
+    this.flushLock = current.catch(() => {});
+    return current;
+  }
+
+  /// The token attached to events pushed from now on. Changes on [refresh].
+  get sessionToken(): string {
+    return this.config.sessionToken;
+  }
+
   private async flushInternal(): Promise<void> {
     const rows = await this.database.allPending();
     if (rows.length === 0) return;

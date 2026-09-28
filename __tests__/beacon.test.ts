@@ -192,3 +192,95 @@ describe('Beacon batching', () => {
     expect(postCount).toBe(2);
   });
 });
+
+describe('Beacon refresh', () => {
+  afterEach(async () => {
+    if (Beacon.isInitialized) {
+      await Beacon.instance.dispose();
+    }
+  });
+
+  test('uploads pending events and starts a new session', async () => {
+    let postCount = 0;
+    const batches: unknown[][] = [];
+    const fetchFn = mockClient((request) => {
+      postCount++;
+      batches.push((JSON.parse(request.body) as { events: unknown[] }).events);
+      return 202;
+    });
+
+    await Beacon.initialize({
+      apiKey: 'test_key',
+      baseUrl: 'https://example.com',
+      batchSize: 100, // high, so only refresh triggers the upload
+      fetchFn,
+      database: new MemoryBeaconDatabase(),
+      deviceContext: testContext,
+    });
+
+    const firstSession = Beacon.instance.sessionToken;
+
+    await Beacon.instance.push({ eventName: 'one', funnel: 'f', type: 't' });
+    await Beacon.instance.push({ eventName: 'two', funnel: 'f', type: 't' });
+    expect(postCount).toBe(0);
+
+    await Beacon.instance.refresh();
+
+    // Everything pending went up, under the session it was pushed in.
+    expect(postCount).toBe(1);
+    expect(batches[0]).toHaveLength(2);
+    for (const event of batches[0] as { sessionToken: string }[]) {
+      expect(event.sessionToken).toBe(firstSession);
+    }
+
+    // A new session token is now in effect.
+    const secondSession = Beacon.instance.sessionToken;
+    expect(secondSession).not.toBe(firstSession);
+    expect(secondSession).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+
+    // Events pushed after refresh carry the new token.
+    await Beacon.instance.push({ eventName: 'three', funnel: 'f', type: 't' });
+    await Beacon.instance.flush();
+    expect(postCount).toBe(2);
+    expect((batches[1] as { sessionToken: string }[])[0].sessionToken).toBe(
+      secondSession,
+    );
+  });
+
+  test('starts the new session even when the upload fails', async () => {
+    const statuses = [500, 202];
+    const batches: unknown[][] = [];
+    const fetchFn = mockClient((request) => {
+      batches.push((JSON.parse(request.body) as { events: unknown[] }).events);
+      return statuses.shift() ?? 202;
+    });
+
+    await Beacon.initialize({
+      apiKey: 'test_key',
+      baseUrl: 'https://example.com',
+      batchSize: 100,
+      fetchFn,
+      database: new MemoryBeaconDatabase(),
+      deviceContext: testContext,
+    });
+
+    const firstSession = Beacon.instance.sessionToken;
+    await Beacon.instance.push({ eventName: 'stranded', funnel: 'f', type: 't' });
+
+    await Beacon.instance.refresh();
+
+    const secondSession = Beacon.instance.sessionToken;
+    expect(secondSession).not.toBe(firstSession);
+
+    // The undelivered event stayed queued and still belongs to session one.
+    await Beacon.instance.push({ eventName: 'fresh', funnel: 'f', type: 't' });
+    await Beacon.instance.flush();
+
+    const retried = batches[1] as { eventName: string; sessionToken: string }[];
+    expect(retried).toHaveLength(2);
+    expect(retried[0].sessionToken).toBe(firstSession);
+    expect(retried[1].sessionToken).toBe(secondSession);
+  });
+});
