@@ -11,7 +11,7 @@ Port of `beacon_flutter_sdk` — same API surface, same wire format.
 - Optional `immediate: true` to upload without waiting for the batch
 - Manual `flush()` for app lifecycle (background / unmount)
 - `refresh()` to upload everything pending and start a new session
-- Auto-attaches platform, app version, build number, and timezone
+- Auto-attaches `platform`, `app_version`, `build_number`, and `timezone`
 - App can supply `platform`, `appVersion` and `buildNumber` itself; SDK values are used only for what the app leaves out
 - Country is set server-side from the request IP (not by the SDK)
 

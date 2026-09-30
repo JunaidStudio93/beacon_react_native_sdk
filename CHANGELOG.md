@@ -1,5 +1,9 @@
 ## Unreleased
 
+* **Breaking (wire format):** device context is sent as `app_version` and
+  `build_number` instead of `appVersion` / `buildNumber`. `platform` and
+  `timezone` are unchanged.
+
 * Add `buildNumber` to the device context, resolved from the Expo config
   (`ios.buildNumber` / `android.versionCode`).
 * `initialize` now accepts `platform`, `appVersion` and `buildNumber`. A value

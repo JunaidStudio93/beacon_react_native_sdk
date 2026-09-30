@@ -223,8 +223,8 @@ describe('app-supplied device context', () => {
 
     const props = body!.events[0].properties;
     expect(props.platform).toBe('ios');
-    expect(props.appVersion).toBe('2.5.1');
-    expect(props.buildNumber).toBe('318');
+    expect(props.app_version).toBe('2.5.1');
+    expect(props.build_number).toBe('318');
   });
 
   test('blank app values fall back to the resolved ones', async () => {
@@ -249,7 +249,7 @@ describe('app-supplied device context', () => {
     // Outside a React Native runtime these resolve to their fallbacks,
     // which proves the blank overrides were ignored rather than sent.
     expect(body!.events[0].properties.platform).toBe('unknown');
-    expect(body!.events[0].properties.appVersion).toBe('');
+    expect(body!.events[0].properties.app_version).toBe('');
   });
 });
 

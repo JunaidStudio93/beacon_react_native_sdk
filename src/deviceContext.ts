@@ -9,13 +9,14 @@ export interface DeviceContext {
   readonly timezone: string;
 }
 
+/// Wire keys are snake_case: `platform`, `app_version`, `build_number`.
 export function deviceContextToMap(
   context: DeviceContext,
 ): Record<string, unknown> {
   return {
     platform: context.platform,
-    appVersion: context.appVersion,
-    buildNumber: context.buildNumber,
+    app_version: context.appVersion,
+    build_number: context.buildNumber,
     timezone: context.timezone,
   };
 }
