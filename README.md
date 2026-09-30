@@ -45,9 +45,10 @@ implement the `BeaconDatabase` interface and pass it to `initialize`. The
 published type definitions carry no reference to `expo-sqlite`, so you are not
 forced to install it in that case.
 
-App version is read from `expo-application` or `react-native-device-info` if
-either is installed; otherwise it resolves to `''`. Timezone comes from the
-built-in `Intl` API — no extra dependency.
+App version is read from `expo-constants` (a dependency of `expo` itself, so
+no extra install). Pass `appVersion` to `initialize` to override it. Timezone
+comes from the built-in `Intl` API, and platform from `react-native`'s
+`Platform.OS` — no extra dependencies.
 
 ## Getting started
 

@@ -14,6 +14,8 @@ export interface BeaconInitializeOptions {
   fetchFn?: typeof fetch;
   database?: BeaconDatabase;
   deviceContext?: DeviceContext;
+  /// Overrides the app version read from the Expo config.
+  appVersion?: string;
 }
 
 export interface BeaconPushOptions {
@@ -96,7 +98,8 @@ export class Beacon {
     });
 
     const db = options.database ?? new SqliteBeaconDatabase();
-    const context = options.deviceContext ?? (await resolveDeviceContext());
+    const context =
+      options.deviceContext ?? (await resolveDeviceContext(options.appVersion));
     const uploader = new BeaconUploader({ config, fetchFn: options.fetchFn });
 
     const beacon = new Beacon({

@@ -1,5 +1,11 @@
 ## Unreleased
 
+* Fix `platform` resolving to `unknown` and `appVersion` to `''` on device.
+  The resolver used `require(variableName)`, which Metro cannot resolve
+  statically, so both lookups threw at runtime and were swallowed. Both now
+  use literal requires, and the app version comes from `expo-constants`.
+* Add an `appVersion` option to `initialize` to override the resolved version.
+
 * Add `Beacon.instance.refresh()`: uploads all pending events, then starts a
   new session. Events keep the token they were pushed under, so a failed
   upload does not strand them in the wrong session. Exposes
