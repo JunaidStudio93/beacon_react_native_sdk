@@ -1,5 +1,11 @@
 ## Unreleased
 
+* Add `buildNumber` to the device context, resolved from the Expo config
+  (`ios.buildNumber` / `android.versionCode`).
+* `initialize` now accepts `platform`, `appVersion` and `buildNumber`. A value
+  the app supplies always wins; omitted or blank values fall back to the SDK's
+  own lookup.
+
 * Fix `platform` resolving to `unknown` and `appVersion` to `''` on device.
   The resolver used `require(variableName)`, which Metro cannot resolve
   statically, so both lookups threw at runtime and were swallowed. Both now

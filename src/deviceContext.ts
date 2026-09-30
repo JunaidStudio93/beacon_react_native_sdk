@@ -5,6 +5,7 @@
 export interface DeviceContext {
   readonly platform: string;
   readonly appVersion: string;
+  readonly buildNumber: string;
   readonly timezone: string;
 }
 
@@ -14,6 +15,7 @@ export function deviceContextToMap(
   return {
     platform: context.platform,
     appVersion: context.appVersion,
+    buildNumber: context.buildNumber,
     timezone: context.timezone,
   };
 }

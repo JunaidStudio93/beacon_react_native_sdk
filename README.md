@@ -11,7 +11,8 @@ Port of `beacon_flutter_sdk` — same API surface, same wire format.
 - Optional `immediate: true` to upload without waiting for the batch
 - Manual `flush()` for app lifecycle (background / unmount)
 - `refresh()` to upload everything pending and start a new session
-- Auto-attaches platform, app version, and timezone
+- Auto-attaches platform, app version, build number, and timezone
+- App can supply `platform`, `appVersion` and `buildNumber` itself; SDK values are used only for what the app leaves out
 - Country is set server-side from the request IP (not by the SDK)
 
 ## Requirements
@@ -45,10 +46,25 @@ implement the `BeaconDatabase` interface and pass it to `initialize`. The
 published type definitions carry no reference to `expo-sqlite`, so you are not
 forced to install it in that case.
 
-App version is read from `expo-constants` (a dependency of `expo` itself, so
-no extra install). Pass `appVersion` to `initialize` to override it. Timezone
-comes from the built-in `Intl` API, and platform from `react-native`'s
-`Platform.OS` — no extra dependencies.
+App version and build number are read from `expo-constants` (a dependency of
+`expo` itself, so no extra install), platform from `react-native`'s
+`Platform.OS`, and timezone from the built-in `Intl` API. No extra
+dependencies.
+
+The app can supply any of them instead:
+
+```dart
+await Beacon.initialize({
+  apiKey: '...',
+  baseUrl: '...',
+  platform: 'ios',
+  appVersion: '2.5.1',
+  buildNumber: '318',
+});
+```
+
+Each value passed wins over what the SDK would resolve. Anything omitted or
+blank falls back to the resolved value.
 
 ## Getting started
 

@@ -265,6 +265,7 @@ x-api-key: {apiKey}
         "value": "home",
         "platform": "ios",
         "appVersion": "1.2.3",
+        "buildNumber": "318",
         "timezone": "Asia/Karachi"
       }
     }

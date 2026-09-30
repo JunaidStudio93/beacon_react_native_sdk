@@ -3,6 +3,7 @@ export { Beacon } from './beacon';
 export type { BeaconInitializeOptions, BeaconPushOptions } from './beacon';
 export { BeaconConfig } from './beaconConfig';
 export type { DeviceContext } from './deviceContext';
+export type { DeviceContextOverrides } from './deviceContextResolver';
 export type { BeaconEvent } from './eventModel';
 export type {
   BeaconDatabase,

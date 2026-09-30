@@ -1,7 +1,10 @@
 import { BeaconConfig } from './beaconConfig';
 import { BeaconDatabase, SqliteBeaconDatabase } from './db/beaconDatabase';
 import { DeviceContext, deviceContextToMap } from './deviceContext';
-import { resolveDeviceContext } from './deviceContextResolver';
+import {
+  DeviceContextOverrides,
+  resolveDeviceContext,
+} from './deviceContextResolver';
 import { BeaconEvent, eventFromStored } from './eventModel';
 import { sanitizeName, sanitizeValue } from './sanitize';
 import { BeaconUploader } from './uploader';
@@ -14,8 +17,12 @@ export interface BeaconInitializeOptions {
   fetchFn?: typeof fetch;
   database?: BeaconDatabase;
   deviceContext?: DeviceContext;
-  /// Overrides the app version read from the Expo config.
+
+  /// App-supplied context. Each value wins over what the SDK would resolve;
+  /// anything omitted or blank falls back to the resolved value.
+  platform?: string;
   appVersion?: string;
+  buildNumber?: string;
 }
 
 export interface BeaconPushOptions {
@@ -98,8 +105,13 @@ export class Beacon {
     });
 
     const db = options.database ?? new SqliteBeaconDatabase();
+    const overrides: DeviceContextOverrides = {
+      platform: options.platform,
+      appVersion: options.appVersion,
+      buildNumber: options.buildNumber,
+    };
     const context =
-      options.deviceContext ?? (await resolveDeviceContext(options.appVersion));
+      options.deviceContext ?? (await resolveDeviceContext(overrides));
     const uploader = new BeaconUploader({ config, fetchFn: options.fetchFn });
 
     const beacon = new Beacon({

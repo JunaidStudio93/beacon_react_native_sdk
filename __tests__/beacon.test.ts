@@ -6,6 +6,7 @@ import { sanitizeName, sanitizeValue } from '../src/sanitize';
 const testContext: DeviceContext = {
   platform: 'test',
   appVersion: '1.0.0',
+  buildNumber: '42',
   timezone: 'UTC',
 };
 
@@ -190,6 +191,65 @@ describe('Beacon batching', () => {
     // Still pending — flush again should retry.
     await Beacon.instance.flush();
     expect(postCount).toBe(2);
+  });
+});
+
+describe('app-supplied device context', () => {
+  afterEach(async () => {
+    if (Beacon.isInitialized) {
+      await Beacon.instance.dispose();
+    }
+  });
+
+  test('app values win over what the SDK resolves', async () => {
+    let body: { events: { properties: Record<string, unknown> }[] } | undefined;
+    const fetchFn = mockClient((request) => {
+      body = JSON.parse(request.body);
+      return 202;
+    });
+
+    await Beacon.initialize({
+      apiKey: 'test_key',
+      baseUrl: 'https://example.com',
+      batchSize: 1,
+      fetchFn,
+      database: new MemoryBeaconDatabase(),
+      platform: 'ios',
+      appVersion: '2.5.1',
+      buildNumber: '318',
+    });
+
+    await Beacon.instance.push({ eventName: 'e', funnel: 'f', type: 't' });
+
+    const props = body!.events[0].properties;
+    expect(props.platform).toBe('ios');
+    expect(props.appVersion).toBe('2.5.1');
+    expect(props.buildNumber).toBe('318');
+  });
+
+  test('blank app values fall back to the resolved ones', async () => {
+    let body: { events: { properties: Record<string, unknown> }[] } | undefined;
+    const fetchFn = mockClient((request) => {
+      body = JSON.parse(request.body);
+      return 202;
+    });
+
+    await Beacon.initialize({
+      apiKey: 'test_key',
+      baseUrl: 'https://example.com',
+      batchSize: 1,
+      fetchFn,
+      database: new MemoryBeaconDatabase(),
+      platform: '   ',
+      appVersion: '',
+    });
+
+    await Beacon.instance.push({ eventName: 'e', funnel: 'f', type: 't' });
+
+    // Outside a React Native runtime these resolve to their fallbacks,
+    // which proves the blank overrides were ignored rather than sent.
+    expect(body!.events[0].properties.platform).toBe('unknown');
+    expect(body!.events[0].properties.appVersion).toBe('');
   });
 });
 
