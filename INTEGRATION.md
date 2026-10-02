@@ -229,7 +229,79 @@ async function signOut() {
 }
 ```
 
-## 7. How it behaves
+## 7. Anonymous users and sign-in
+
+While nobody is signed in the app has no email to send. Put the **device id**
+in the `email` field:
+
+```ts
+await Beacon.instance.push({
+  eventName: 'screen_view',
+  funnel: 'onboarding',
+  type: 'navigation',
+  email: deviceId, // stands in for the real email until sign-in
+});
+```
+
+This is the right slot, not a hack: `email` is the identity column every
+dashboard aggregate groups by. Sending the device id there makes each device
+count as its own user. Leaving it blank would collapse every logged-out user
+into a single anonymous blob.
+
+The device id is yours to generate and persist — the SDK does not create one.
+Any stable per-install string works; it must survive app restarts, or each
+launch looks like a new user.
+
+### Joining the two halves
+
+When the user signs in, hand the real email over:
+
+```ts
+await Beacon.instance.identify(deviceId, user.email);
+```
+
+The backend rewrites every event already recorded under that device id onto the
+real email, so the anonymous and signed-in halves become one user in the panel.
+From this point on, pass the real email on `push()` as usual.
+
+```tsx
+async function onSignIn(user: User) {
+  await Beacon.instance.identify(deviceId, user.email);
+  await Beacon.instance.push({
+    eventName: 'sign_in',
+    funnel: 'account',
+    type: 'lifecycle',
+    uid: user.id,
+    email: user.email,
+  });
+}
+```
+
+### What to expect
+
+- **The rewrite is asynchronous.** `identify()` resolves as soon as the server
+  accepts the request; the rows change in BigQuery a few seconds later. A user
+  looked up in the panel immediately after sign-in may still show the device
+  id. This is normal.
+- **It flushes first.** Events still queued locally were pushed under the
+  device id, and the server-side rewrite only sees what has already arrived.
+  `identify()` uploads the queue before requesting the rewrite so those events
+  are not stranded under the old identity.
+- **It never throws on failure.** A network error or a server rejection is
+  logged, like `push()` and `flush()`. Analytics must not break sign-in.
+- **It is not retried.** If the rewrite fails the device's history keeps the
+  device id while new events carry the real email — the user shows up split.
+  Calling `identify()` again with the same pair is safe and will retry it.
+- **It throws on empty arguments.** Those are programming errors, not runtime
+  conditions.
+- **Only the last 90 days are rewritten** (the backend's
+  `IDENTIFY_LOOKBACK_DAYS`). A device anonymous for longer keeps the device id
+  on anything older.
+
+Call it once per sign-in. Calling it on every launch for an already-identified
+user costs a full BigQuery scan each time and changes nothing.
+
+## 8. How it behaves
 
 1. Every `push()` **writes to local SQLite first**, then decides whether to
    upload. Nothing is lost to a crash mid-request.
@@ -280,7 +352,7 @@ x-api-key: {apiKey}
 
 ---
 
-## 8. Sanitization rules
+## 9. Sanitization rules
 
 Applied automatically to `eventName` and `funnel`:
 
@@ -301,7 +373,7 @@ Applied automatically to `eventName` and `funnel`:
 
 ---
 
-## 9. Verification checklist
+## 10. Verification checklist
 
 Work through this on first integration:
 
@@ -314,12 +386,18 @@ Work through this on first integration:
 - [ ] Kill the app with events pending, relaunch → they upload on init
 - [ ] Airplane mode → events queue, no crash; reconnect → they upload
 - [ ] `properties` shows correct `platform`, `appVersion`, `timezone`
+- [ ] Logged-out events carry the device id in `email`, and the panel shows
+      that device as its own user
+- [ ] `identify(deviceId, email)` → one `POST /identify`, server responds
+      **202**
+- [ ] A minute later, the panel shows that device's old events under the real
+      email
 
 The offline test matters most — that is the path with the least coverage.
 
 ---
 
-## 10. Known limitations
+## 11. Known limitations
 
 Carried over deliberately from the Flutter SDK so both stay identical. Not
 bugs introduced in this port, but they will be hit in production:
@@ -342,7 +420,7 @@ awaiting them in UI code.
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
@@ -355,7 +433,7 @@ awaiting them in UI code.
 
 ---
 
-## 12. Status
+## 13. Status
 
 - Ported from `beacon_flutter_sdk` 0.0.1; identical API surface and wire format
 - Type-checked against `expo-sqlite` 57.0.3
