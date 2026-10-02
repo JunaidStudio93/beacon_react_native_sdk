@@ -1,11 +1,15 @@
 ## Unreleased
 
-* Add `Beacon.instance.identify(deviceId, email)`: attaches a real email to a
-  device's anonymous event history. Apps send their device id in the `email`
-  field while logged out; this call asks the backend (`POST /identify`) to
-  rewrite that history onto the real email once the user signs in. Flushes
-  pending events first so none are stranded under the old identity. Failures
-  are logged, not thrown.
+* Add `Beacon.instance.identify(deviceId, email, uid)`: attaches a real email
+  and uid to a device's anonymous event history. Apps send their device id in
+  the `email` and `uid` fields while logged out; this call asks the backend
+  (`POST /identify`) to rewrite that history onto the real identity once the
+  user signs in. Flushes pending events first so none are stranded under the
+  old identity. Failures are logged, not thrown.
+
+  `uid` is required by the API on every tracked event, so apps must send the
+  device id there too while logged out — an empty `uid` is rejected with
+  `400 uid is required` and the event never reaches the panel.
 
 * **Breaking (wire format):** device context is sent as `app_version` and
   `build_number` instead of `appVersion` / `buildNumber`. `platform` and

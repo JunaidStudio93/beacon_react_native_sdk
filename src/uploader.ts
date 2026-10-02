@@ -34,14 +34,14 @@ export class BeaconUploader {
   ///
   /// 202 means the backfill job was submitted, not that it has finished — the
   /// rewrite completes inside BigQuery a few seconds later.
-  async identify(deviceId: string, email: string): Promise<boolean> {
+  async identify(deviceId: string, email: string, uid: string): Promise<boolean> {
     const response = await this.fetchFn(this.config.identifyUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': this.config.apiKey,
       },
-      body: JSON.stringify({ deviceId, email }),
+      body: JSON.stringify({ deviceId, email, uid }),
     });
 
     return response.status === 202;

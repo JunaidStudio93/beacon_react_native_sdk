@@ -364,7 +364,7 @@ describe('Beacon identify', () => {
     return db;
   }
 
-  test('posts deviceId and email to /identify with the api key', async () => {
+  test('posts deviceId, email and uid to /identify with the api key', async () => {
     const calls: CapturedRequest[] = [];
     const fetchFn = mockClient((request) => {
       calls.push(request);
@@ -372,7 +372,7 @@ describe('Beacon identify', () => {
     });
 
     await init(fetchFn);
-    await Beacon.instance.identify('device_abc', 'user@example.com');
+    await Beacon.instance.identify('device_abc', 'user@example.com', 'uid_123');
 
     const identifyCalls = calls.filter((c) => c.url.endsWith('/identify'));
     expect(identifyCalls).toHaveLength(1);
@@ -380,6 +380,7 @@ describe('Beacon identify', () => {
     expect(JSON.parse(identifyCalls[0].body)).toEqual({
       deviceId: 'device_abc',
       email: 'user@example.com',
+      uid: 'uid_123',
     });
   });
 
@@ -401,7 +402,7 @@ describe('Beacon identify', () => {
     // Still queued — batchSize is 100.
     expect(await db.pendingCount()).toBe(1);
 
-    await Beacon.instance.identify('device_abc', 'user@example.com');
+    await Beacon.instance.identify('device_abc', 'user@example.com', 'uid_123');
 
     // The queued event must reach the server BEFORE the rewrite runs,
     // otherwise it lands after the UPDATE and keeps the device id forever.
@@ -417,7 +418,7 @@ describe('Beacon identify', () => {
     });
 
     await init(fetchFn);
-    await Beacon.instance.identify('  device_abc  ', '  user@example.com  ');
+    await Beacon.instance.identify('  device_abc  ', '  user@example.com  ', '  uid_123  ');
 
     const body = JSON.parse(
       calls.filter((c) => c.url.endsWith('/identify'))[0].body,
@@ -425,18 +426,22 @@ describe('Beacon identify', () => {
     expect(body).toEqual({
       deviceId: 'device_abc',
       email: 'user@example.com',
+      uid: 'uid_123',
     });
   });
 
   test('rejects empty arguments', async () => {
     await init(mockClient(() => 202));
 
-    expect(() => Beacon.instance.identify('   ', 'user@example.com')).toThrow(
+    expect(() => Beacon.instance.identify('   ', 'user@example.com', 'uid_123')).toThrow(
       'deviceId must not be empty',
     );
-    expect(() => Beacon.instance.identify('device_abc', '  ')).toThrow(
+    expect(() => Beacon.instance.identify('device_abc', '  ', 'uid_123')).toThrow(
       'email must not be empty',
     );
+    expect(() =>
+      Beacon.instance.identify('device_abc', 'user@example.com', '  '),
+    ).toThrow('uid must not be empty');
   });
 
   test('does not throw when the server rejects or the network fails', async () => {
@@ -444,7 +449,7 @@ describe('Beacon identify', () => {
 
     await init(mockClient((request) => (request.url.endsWith('/identify') ? 500 : 202)));
     await expect(
-      Beacon.instance.identify('device_abc', 'user@example.com'),
+      Beacon.instance.identify('device_abc', 'user@example.com', 'uid_123'),
     ).resolves.toBeUndefined();
     await Beacon.instance.dispose();
 
@@ -455,7 +460,7 @@ describe('Beacon identify', () => {
 
     await init(exploding);
     await expect(
-      Beacon.instance.identify('device_abc', 'user@example.com'),
+      Beacon.instance.identify('device_abc', 'user@example.com', 'uid_123'),
     ).resolves.toBeUndefined();
 
     warn.mockRestore();
@@ -478,7 +483,7 @@ describe('Beacon identify', () => {
       email: 'device_abc',
     });
 
-    await Beacon.instance.identify('device_abc', 'user@example.com');
+    await Beacon.instance.identify('device_abc', 'user@example.com', 'uid_123');
 
     expect(order).toEqual(['track', 'identify']);
     // Upload failed, so the event is kept for the next flush — but it now

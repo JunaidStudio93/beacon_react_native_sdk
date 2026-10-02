@@ -194,12 +194,12 @@ export class Beacon {
     return current;
   }
 
-  /// Attaches a real email to a device's anonymous event history.
+  /// Attaches a real email and uid to a device's anonymous event history.
   ///
-  /// While the user is logged out the app has no email to send, so it puts its
-  /// device id in the `email` field of every event. Call this once the user
-  /// signs in and the backend rewrites that history onto [email], joining the
-  /// anonymous and logged-in halves into a single user.
+  /// While the user is logged out the app has no email or uid to send, so it
+  /// puts its device id in both fields of every event. Call this once the user
+  /// signs in and the backend rewrites that history onto [email] and [uid],
+  /// joining the anonymous and logged-in halves into a single user.
   ///
   /// Flushes first, on the same lock as [flush]: events still queued locally
   /// were pushed under the device id, and the server-side rewrite only sees
@@ -209,12 +209,15 @@ export class Beacon {
   /// Like [push] and [flush], a network or server failure is logged rather
   /// than thrown — analytics must never break the calling app. Throws only on
   /// invalid arguments, which are programming errors.
-  identify(deviceId: string, email: string): Promise<void> {
+  identify(deviceId: string, email: string, uid: string): Promise<void> {
     if (deviceId.trim().length === 0) {
       throw new Error('deviceId must not be empty');
     }
     if (email.trim().length === 0) {
       throw new Error('email must not be empty');
+    }
+    if (uid.trim().length === 0) {
+      throw new Error('uid must not be empty');
     }
 
     const previous = this.flushLock;
@@ -224,6 +227,7 @@ export class Beacon {
         const accepted = await this.uploader.identify(
           deviceId.trim(),
           email.trim(),
+          uid.trim(),
         );
         if (!accepted) {
           console.warn('Beacon: identify rejected (non-202)');

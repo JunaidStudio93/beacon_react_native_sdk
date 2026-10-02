@@ -257,7 +257,7 @@ launch looks like a new user.
 When the user signs in, hand the real email over:
 
 ```ts
-await Beacon.instance.identify(deviceId, user.email);
+await Beacon.instance.identify(deviceId, user.email, user.uid);
 ```
 
 The backend rewrites every event already recorded under that device id onto the
@@ -266,7 +266,7 @@ From this point on, pass the real email on `push()` as usual.
 
 ```tsx
 async function onSignIn(user: User) {
-  await Beacon.instance.identify(deviceId, user.email);
+  await Beacon.instance.identify(deviceId, user.email, user.uid);
   await Beacon.instance.push({
     eventName: 'sign_in',
     funnel: 'account',
