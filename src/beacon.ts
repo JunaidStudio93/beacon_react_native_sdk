@@ -149,7 +149,11 @@ export class Beacon {
       ...(properties ?? {}),
     };
 
+    // Minted here, at creation, not at upload: the id is stored alongside the
+    // event, so an event the app resends after a suspended-before-202 launch
+    // arrives with the id it was born with and the backend can drop it.
     await this.database.insertEvent({
+      eventId: uuidV4(),
       eventName: sanitizeName(eventName),
       funnel: sanitizeName(funnel),
       uid,
@@ -251,6 +255,7 @@ export class Beacon {
 
     const events: BeaconEvent[] = rows.map((row) =>
       eventFromStored({
+        eventId: row.eventId,
         eventName: row.eventName,
         uid: row.uid,
         funnel: row.funnel,

@@ -1,8 +1,13 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { uuidV4 } from '../uuid';
 
 /// A pending row as stored locally, mirroring the Drift `PendingEvents` table.
 export interface PendingEvent {
   readonly id: number;
+  /// Stable identifier for the event itself, assigned when it was created.
+  /// Unlike [id] (a local row number) this survives a resend, which is what
+  /// lets the backend recognize a duplicate upload.
+  readonly eventId: string;
   readonly eventName: string;
   readonly funnel: string;
   readonly uid: string;
@@ -27,6 +32,7 @@ export interface BeaconDatabase {
 const CREATE_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS pending_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id TEXT NOT NULL DEFAULT '',
   event_name TEXT NOT NULL,
   funnel TEXT NOT NULL,
   uid TEXT NOT NULL,
@@ -38,6 +44,7 @@ CREATE TABLE IF NOT EXISTS pending_events (
 
 interface SqliteRow {
   id: number;
+  event_id: string;
   event_name: string;
   funnel: string;
   uid: string;
@@ -68,19 +75,51 @@ export class SqliteBeaconDatabase implements BeaconDatabase {
         const sqlite = require('expo-sqlite') as typeof import('expo-sqlite');
         const db = await sqlite.openDatabaseAsync(this.fileName);
         await db.execAsync(CREATE_TABLE_SQL);
+        await SqliteBeaconDatabase.migrate(db);
         return db;
       })();
     }
     return this.handle;
   }
 
+  /// Brings a table created by an older SDK version up to date.
+  ///
+  /// Installs that upgrade mid-queue have rows with no `event_id`. They get
+  /// one here so every row the SDK uploads carries an id, but a backfilled id
+  /// is newly minted on this launch: if such a row was already delivered
+  /// before the upgrade, the backend has no matching id to dedupe against.
+  /// That residual is limited to the events queued across the one upgrade.
+  private static async migrate(db: SQLiteDatabase): Promise<void> {
+    const columns = await db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(pending_events)',
+    );
+    const hasEventId = columns.some((column) => column.name === 'event_id');
+
+    if (!hasEventId) {
+      await db.execAsync(
+        "ALTER TABLE pending_events ADD COLUMN event_id TEXT NOT NULL DEFAULT ''",
+      );
+    }
+
+    const missing = await db.getAllAsync<{ id: number }>(
+      "SELECT id FROM pending_events WHERE event_id = '' OR event_id IS NULL",
+    );
+    for (const row of missing) {
+      await db.runAsync('UPDATE pending_events SET event_id = ? WHERE id = ?', [
+        uuidV4(),
+        row.id,
+      ]);
+    }
+  }
+
   async insertEvent(entry: PendingEventInsert): Promise<number> {
     const db = await this.open();
     const result = await db.runAsync(
       `INSERT INTO pending_events
-        (event_name, funnel, uid, email, session_token, timestamp, properties_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        (event_id, event_name, funnel, uid, email, session_token, timestamp, properties_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        entry.eventId,
         entry.eventName,
         entry.funnel,
         entry.uid,
@@ -108,6 +147,7 @@ export class SqliteBeaconDatabase implements BeaconDatabase {
     );
     return rows.map((row) => ({
       id: row.id,
+      eventId: row.event_id,
       eventName: row.event_name,
       funnel: row.funnel,
       uid: row.uid,
