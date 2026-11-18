@@ -1,5 +1,20 @@
 ## Unreleased
 
+* Add a unique `eventId` (UUID v4) to every event. It is generated when the
+  event is created, stored in the local queue alongside it, and sent as a
+  top-level field on `/track`. An event that is re-sent — because the app was
+  suspended before the `202` landed, so the row was never deleted — arrives
+  with the id it was created with, letting the backend drop the duplicate.
+
+  **Backend:** dedupe on `eventId`. Nothing is required of calling apps; the
+  id is minted inside `push()`.
+
+  The local `pending_events` table gains an `event_id` column, added by an
+  automatic migration on first open. Rows already queued when a device
+  upgrades are backfilled with fresh ids, so they carry an id but cannot be
+  matched against a copy delivered before the upgrade — a one-time residual
+  limited to whatever was in the queue at the moment of the upgrade.
+
 * Add `Beacon.instance.identify(deviceId, email, uid)`: attaches a real email
   and uid to a device's anonymous event history. Apps send their device id in
   the `email` and `uid` fields while logged out; this call asks the backend

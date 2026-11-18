@@ -1,5 +1,9 @@
 /// Event payload sent to the Beacon `/track` endpoint.
 export interface BeaconEvent {
+  /// Stable per-event identifier, generated once when the event is created and
+  /// persisted with it. A retried upload carries the same `eventId`, so the
+  /// backend can drop the repeat instead of counting it twice.
+  readonly eventId: string;
   readonly eventName: string;
   readonly uid: string;
   readonly funnel: string;
@@ -11,6 +15,7 @@ export interface BeaconEvent {
 
 export function eventToJson(event: BeaconEvent): Record<string, unknown> {
   return {
+    eventId: event.eventId,
     eventName: event.eventName,
     uid: event.uid,
     funnel: event.funnel,
@@ -22,6 +27,7 @@ export function eventToJson(event: BeaconEvent): Record<string, unknown> {
 }
 
 export function eventFromStored(params: {
+  eventId: string;
   eventName: string;
   uid: string;
   funnel: string;
@@ -32,6 +38,7 @@ export function eventFromStored(params: {
 }): BeaconEvent {
   const decoded = JSON.parse(params.propertiesJson) as Record<string, unknown>;
   return {
+    eventId: params.eventId,
     eventName: params.eventName,
     uid: params.uid,
     funnel: params.funnel,

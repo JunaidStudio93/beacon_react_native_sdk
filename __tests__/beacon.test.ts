@@ -493,3 +493,86 @@ describe('Beacon identify', () => {
     warn.mockRestore();
   });
 });
+
+describe('event ids', () => {
+  afterEach(async () => {
+    if (Beacon.isInitialized) {
+      await Beacon.instance.dispose();
+    }
+  });
+
+  test('every event carries a distinct id', async () => {
+    let body: { events: { eventId: string }[] } | undefined;
+    const fetchFn = mockClient((request) => {
+      body = JSON.parse(request.body);
+      return 202;
+    });
+
+    await Beacon.initialize({
+      apiKey: 'test_key',
+      baseUrl: 'https://example.com',
+      batchSize: 2,
+      fetchFn,
+      database: new MemoryBeaconDatabase(),
+      deviceContext: testContext,
+    });
+
+    await Beacon.instance.push({ eventName: 'one', funnel: 'f', type: 't' });
+    await Beacon.instance.push({ eventName: 'two', funnel: 'f', type: 't' });
+
+    const ids = body!.events.map((event) => event.eventId);
+    expect(ids).toHaveLength(2);
+    for (const id of ids) {
+      expect(id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    }
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  test('a resend carries the id the event was created with', async () => {
+    // The duplicate case from production: the app is suspended before the 202
+    // lands, the row is never deleted, and the next launch sends it again.
+    const batches: { eventId: string; timestamp: string }[][] = [];
+    let status = 500;
+    const fetchFn = mockClient((request) => {
+      batches.push(JSON.parse(request.body).events);
+      return status;
+    });
+
+    // Stands in for the on-disk SQLite queue, which keeps its rows across a
+    // close; the in-memory one drops them, which is the thing under test here.
+    class PersistentDatabase extends MemoryBeaconDatabase {
+      async close(): Promise<void> {}
+    }
+    const database = new PersistentDatabase();
+
+    await Beacon.initialize({
+      apiKey: 'test_key',
+      baseUrl: 'https://example.com',
+      batchSize: 1,
+      fetchFn,
+      database,
+      deviceContext: testContext,
+    });
+
+    await Beacon.instance.push({ eventName: 'one', funnel: 'f', type: 't' });
+    expect(batches).toHaveLength(1);
+
+    // Relaunch against the same queue; this time the upload is accepted.
+    status = 202;
+    await Beacon.initialize({
+      apiKey: 'test_key',
+      baseUrl: 'https://example.com',
+      batchSize: 1,
+      fetchFn,
+      database,
+      deviceContext: testContext,
+    });
+
+    expect(batches).toHaveLength(2);
+    expect(batches[1][0].eventId).toBe(batches[0][0].eventId);
+    expect(batches[1][0].timestamp).toBe(batches[0][0].timestamp);
+    expect(await database.pendingCount()).toBe(0);
+  });
+});

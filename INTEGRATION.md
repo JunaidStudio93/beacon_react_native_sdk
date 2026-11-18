@@ -326,6 +326,7 @@ x-api-key: {apiKey}
 {
   "events": [
     {
+      "eventId": "9f1c2b4e-5d3a-4f8c-9a71-2b6d4e8c1f03",
       "eventName": "screen_view",
       "uid": "u_123",
       "funnel": "onboarding",
@@ -345,6 +346,12 @@ x-api-key: {apiKey}
 }
 ```
 
+- `eventId` is a UUID v4 minted when the event is created and stored with it.
+  It is the de-duplication key: if the app is suspended before the `202`
+  arrives, the event stays queued and is re-sent on the next launch carrying
+  the **same** `eventId` (and the same `timestamp`), so the backend can drop
+  the repeat. Treat `eventId` as unique per event and ignore any event whose
+  `eventId` has already been ingested.
 - `sessionToken` is a UUID v4 generated once per `initialize()` call.
 - `timestamp` is UTC ISO 8601.
 - `properties.country` is **not** sent — the backend derives it from the
@@ -385,6 +392,7 @@ Work through this on first integration:
 - [ ] Fire one event with `immediate: true` → uploads right away
 - [ ] Kill the app with events pending, relaunch → they upload on init
 - [ ] Airplane mode → events queue, no crash; reconnect → they upload
+- [ ] every event has a distinct `eventId`
 - [ ] `properties` shows correct `platform`, `appVersion`, `timezone`
 - [ ] Logged-out events carry the device id in `email`, and the panel shows
       that device as its own user
