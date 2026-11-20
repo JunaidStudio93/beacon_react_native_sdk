@@ -1,6 +1,6 @@
 {
   "name": "beacon-react-native-sdk",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Beacon event tracking SDK for React Native with SQLite-backed batching.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

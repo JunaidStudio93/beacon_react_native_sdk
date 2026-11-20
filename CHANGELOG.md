@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.0
 
 * Add a unique `eventId` (UUID v4) to every event. It is generated when the
   event is created, stored in the local queue alongside it, and sent as a
