@@ -1,5 +1,9 @@
 import { BeaconConfig } from './beaconConfig';
-import { BeaconDatabase, SqliteBeaconDatabase } from './db/beaconDatabase';
+import {
+  BeaconDatabase,
+  PendingEvent,
+  SqliteBeaconDatabase,
+} from './db/beaconDatabase';
 import { DeviceContext, deviceContextToMap } from './deviceContext';
 import {
   DeviceContextOverrides,
@@ -152,23 +156,39 @@ export class Beacon {
     // Minted here, at creation, not at upload: the id is stored alongside the
     // event, so an event the app resends after a suspended-before-202 launch
     // arrives with the id it was born with and the backend can drop it.
-    await this.database.insertEvent({
-      eventId: uuidV4(),
-      eventName: sanitizeName(eventName),
-      funnel: sanitizeName(funnel),
-      uid,
-      email,
-      sessionToken: this.config.sessionToken,
-      timestamp: new Date().toISOString(),
-      propertiesJson: JSON.stringify(props),
-    });
+    try {
+      await this.database.insertEvent({
+        eventId: uuidV4(),
+        eventName: sanitizeName(eventName),
+        funnel: sanitizeName(funnel),
+        uid,
+        email,
+        sessionToken: this.config.sessionToken,
+        timestamp: new Date().toISOString(),
+        propertiesJson: JSON.stringify(props),
+      });
+    } catch (e) {
+      // The event is lost, and that is the right trade: a device whose local
+      // storage will not open is not a reason for the host app's checkout to
+      // throw. Logged rather than raised, like every other failure here.
+      console.warn('Beacon: could not queue event; dropped', e);
+      return;
+    }
 
     if (immediate) {
       await this.flush();
       return;
     }
 
-    const count = await this.database.pendingCount();
+    let count: number;
+    try {
+      count = await this.database.pendingCount();
+    } catch (e) {
+      // The row is already queued; only the decision to flush now is lost, and
+      // the next push or launch makes it again.
+      console.warn('Beacon: could not read the pending count', e);
+      return;
+    }
     if (count >= this.config.batchSize) {
       await this.flush();
     }
@@ -250,7 +270,18 @@ export class Beacon {
   }
 
   private async flushInternal(): Promise<void> {
-    const rows = await this.database.allPending();
+    // Storage failures stop here rather than travelling out through flush().
+    // initialize() awaits a flush, so a database that will not open would
+    // otherwise make initialization itself throw — and an app that awaits
+    // Beacon.initialize() at startup would come up with no analytics at all,
+    // or not come up.
+    let rows: PendingEvent[];
+    try {
+      rows = await this.database.allPending();
+    } catch (e) {
+      console.warn('Beacon: could not read the queue; nothing uploaded', e);
+      return;
+    }
     if (rows.length === 0) return;
 
     const events: BeaconEvent[] = rows.map((row) =>
