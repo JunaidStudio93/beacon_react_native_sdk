@@ -70,7 +70,7 @@ export class SqliteBeaconDatabase implements BeaconDatabase {
 
   private open(): Promise<SQLiteDatabase> {
     if (!this.handle) {
-      this.handle = (async () => {
+      const opening = (async () => {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const sqlite = require('expo-sqlite') as typeof import('expo-sqlite');
         const db = await sqlite.openDatabaseAsync(this.fileName);
@@ -78,6 +78,17 @@ export class SqliteBeaconDatabase implements BeaconDatabase {
         await SqliteBeaconDatabase.migrate(db);
         return db;
       })();
+
+      // A failed open is deliberately not kept. Caching the rejected promise
+      // would turn one bad moment — storage still locked just after boot, a
+      // migration interrupted by the process dying — into a permanent fault:
+      // every later call would await the same rejection and the queue would
+      // stay shut for the life of the process. Forgetting it lets the next
+      // push open the database again.
+      this.handle = opening;
+      void opening.catch(() => {
+        if (this.handle === opening) this.handle = undefined;
+      });
     }
     return this.handle;
   }
@@ -104,11 +115,21 @@ export class SqliteBeaconDatabase implements BeaconDatabase {
     const missing = await db.getAllAsync<{ id: number }>(
       "SELECT id FROM pending_events WHERE event_id = '' OR event_id IS NULL",
     );
+
+    // Per row, and best effort. The column is the part inserts depend on, and
+    // it exists by now; a row that cannot be given an id is left as it is
+    // rather than failing the open and taking the whole queue down with it.
+    // Such a row uploads with an empty id, which the backend treats as no id
+    // at all — the same place it would have been without this migration.
     for (const row of missing) {
-      await db.runAsync('UPDATE pending_events SET event_id = ? WHERE id = ?', [
-        uuidV4(),
-        row.id,
-      ]);
+      try {
+        await db.runAsync(
+          'UPDATE pending_events SET event_id = ? WHERE id = ?',
+          [uuidV4(), row.id],
+        );
+      } catch (e) {
+        console.warn('Beacon: could not backfill an event id', e);
+      }
     }
   }
 

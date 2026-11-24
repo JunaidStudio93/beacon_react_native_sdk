@@ -1,3 +1,27 @@
+## Unreleased
+
+* A failing database no longer breaks the calling app. A failure to open, read
+  or write the local queue is logged and swallowed inside `push()` and
+  `flush()` — the same treatment network failures already had, and what the
+  SDK's own documentation claimed. Because `initialize()` flushes whatever the
+  last session left behind, this is also what let a device with unreadable
+  storage fail initialization outright and come up with no analytics at all.
+
+* A failed open is no longer cached. `SqliteBeaconDatabase` kept the rejected
+  promise in its handle, so one bad moment — storage still locked just after
+  boot, a migration cut short by the process dying — closed the queue for the
+  life of the process, every later call awaiting the first failure. The next
+  call now opens the database again.
+
+* The `event_id` backfill is per row and best effort. A row that cannot be
+  given an id is left as it is rather than failing the migration and taking
+  the whole queue with it; it uploads with an empty id, which is where it
+  would have been without the migration.
+
+* The v1 -> v2 migration is now tested against real SQLite rather than an
+  in-memory stand-in: a table created as 0.0.1 created it, migrated, reopened,
+  and written to.
+
 ## 0.1.0
 
 * Add a unique `eventId` (UUID v4) to every event. It is generated when the
@@ -6,8 +30,11 @@
   suspended before the `202` landed, so the row was never deleted — arrives
   with the id it was created with, letting the backend drop the duplicate.
 
-  **Backend:** dedupe on `eventId`. Nothing is required of calling apps; the
-  id is minted inside `push()`.
+  **Backend:** dedupe on `eventId`. An app that calls `push()` needs no
+  change — the id is minted there. An app that supplies its own
+  `BeaconDatabase` must store and return `eventId`: it is a new field on
+  `PendingEvent`, and a row that comes back without one uploads with an empty
+  id, which the backend stores as no id at all.
 
   The local `pending_events` table gains an `event_id` column, added by an
   automatic migration on first open. Rows already queued when a device

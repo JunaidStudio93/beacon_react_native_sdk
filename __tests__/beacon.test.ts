@@ -576,3 +576,84 @@ describe('event ids', () => {
     expect(await database.pendingCount()).toBe(0);
   });
 });
+
+/// Analytics must never break the calling app. Every storage failure here is
+/// logged and swallowed; the only things push() and flush() may raise are
+/// programming errors.
+describe('a database that fails', () => {
+  class BrokenDatabase extends MemoryBeaconDatabase {
+    constructor(private readonly failOn: 'insert' | 'count' | 'read') {
+      super();
+    }
+
+    async insertEvent(
+      entry: Parameters<MemoryBeaconDatabase['insertEvent']>[0],
+    ): Promise<number> {
+      if (this.failOn === 'insert') throw new Error('disk is full');
+      return super.insertEvent(entry);
+    }
+
+    async pendingCount(): Promise<number> {
+      if (this.failOn === 'count') throw new Error('database is locked');
+      return super.pendingCount();
+    }
+
+    async allPending(): Promise<
+      Awaited<ReturnType<MemoryBeaconDatabase['allPending']>>
+    > {
+      if (this.failOn === 'read') throw new Error('database is corrupt');
+      return super.allPending();
+    }
+  }
+
+  let warn: jest.SpyInstance;
+
+  beforeEach(() => {
+    warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(async () => {
+    warn.mockRestore();
+    if (Beacon.isInitialized) await Beacon.instance.dispose();
+  });
+
+  async function start(db: MemoryBeaconDatabase): Promise<Beacon> {
+    return Beacon.initialize({
+      apiKey: 'k',
+      baseUrl: 'https://example.test',
+      database: db,
+      deviceContext: testContext,
+      fetchFn: mockClient(() => 202),
+    });
+  }
+
+  test('initialize survives a queue it cannot read', async () => {
+    // initialize() flushes leftovers from the previous session. If that threw,
+    // an app awaiting Beacon.initialize() at startup would come up with no
+    // analytics at all, or fail to come up.
+    const beacon = await start(new BrokenDatabase('read'));
+    expect(Beacon.isInitialized).toBe(true);
+    await expect(beacon.flush()).resolves.toBeUndefined();
+  });
+
+  test('push does not throw when the event cannot be stored', async () => {
+    const beacon = await start(new BrokenDatabase('insert'));
+    await expect(
+      beacon.push({ eventName: 'checkout', funnel: 'shop', type: 'tap' }),
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  test('push keeps the event when only the flush decision fails', async () => {
+    const db = new BrokenDatabase('count');
+    const beacon = await start(db);
+
+    await expect(
+      beacon.push({ eventName: 'checkout', funnel: 'shop', type: 'tap' }),
+    ).resolves.toBeUndefined();
+
+    // The row was written before the count was asked for, so it is still
+    // queued and the next launch sends it.
+    expect(await MemoryBeaconDatabase.prototype.pendingCount.call(db)).toBe(1);
+  });
+});
